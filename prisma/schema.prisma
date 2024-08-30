@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  UserRole    UserRole[]
+  MenuRole    MenuRole[]
+
+  @@map("roles")
+}
+
+model User {
+  id                   String         @id @default(uuid())
+  name                 String
+  email                String?
+  nationalID           Int            @unique
+  staffNo              String?
+  jobGroup             String?
+  jobTitle             String?
+  dob                  String?
+  phoneNumber          String
+  password             String
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  userRole             UserRole[]
+  attendee             Attendance[]   @relation("attendee")
+  confirmations        Confirmation[]
+  eventCreator         Event[]        @relation("EventCreator")
+  eventUpdator         Event[]        @relation("EventUpdator")
+  confirmationsCreator Confirmation[] @relation("ConfirmationsCreator")
+  confirmationUpdator  Confirmation[] @relation("ConfirmationUpdator")
+  attendanceCreator    Attendance[]   @relation("attendanceCreator")
+  attendanceUpdator    Attendance[]   @relation("attendanceUpdator")
+  payment              Payment[]
+  accountant           Payment[]      @relation("accountant")
+  actionLogs           ActionLogs[]
+
+  @@map("users")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("userroles")
+}
+
+model Menu {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  name       String     @unique
+  title      String     @unique
+  tooltip    String
+  iconName   String
+  route      String
+  routeTitle String
+  ordering   Int
+  parent     String?
+  level      Int
+  expandOnly Boolean    @default(false)
+  hasSubMenu Boolean    @default(false)
+  isVisible  Boolean    @default(true)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  menuRole   MenuRole[]
+
+  @@map("menus")
+}
+
+model MenuRole {
+  id        String   @id @default(uuid())
+  menu      Menu     @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  menuId    String
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("menuroles")
+}
+
+model Event {
+  id            String         @id @default(uuid())
+  name          String
+  startDate     String
+  startingTime  String
+  endDate       String
+  closingTime   String
+  country       String
+  county        String
+  constituency  String?
+  actualAddress String
+  targetGroup   String?
+  purpose       String
+  description   String?
+  memoNo        String?
+  status        String         @default("New") //New, Published, Closed
+  capacity      Int            @default(0)
+  createdAt     DateTime       @default(now())
+  creator       User           @relation("EventCreator", fields: [createdBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  createdBy     String
+  updatedAt     DateTime       @updatedAt
+  updator       User           @relation("EventUpdator", fields: [updatedBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  updatedBy     String
+  attendance    Attendance[]
+  confirmation  Confirmation[]
+  payment       Payment[]
+  inviteCode    InviteCode[]
+  confirmCode   ConfirmCode[]
+
+  @@map("events")
+}
+
+model InviteCode {
+  id            String   @id @default(uuid())
+  code          String   @unique
+  isActive      Boolean  @default(true)
+  compensations String   @default("")
+  description   String?
+  totalAmount   Decimal  @default(0.0) @db.Decimal(12, 2)
+  event         Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("inviteCodes")
+}
+
+model ConfirmCode {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  isActive    Boolean  @default(true)
+  description String?
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("confirmCodes")
+}
+
+model Attendance {
+  id               String         @id @default(uuid())
+  user             User           @relation("attendee", fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  userId           String
+  event            Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId          String
+  mpesaNumber      String
+  registrationCode String?
+  jobGroup         String         @default("A")
+  inviteCode       String         @default("")
+  totalAmount      Decimal        @default(0.0) @db.Decimal(12, 2)
+  createdAt        DateTime       @default(now())
+  creator          User           @relation("attendanceCreator", fields: [createdBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  createdBy        String
+  updatedAt        DateTime       @updatedAt
+  updator          User           @relation("attendanceUpdator", fields: [updatedBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  updatedBy        String
+  payment          Payment[]
+  confirmation     Confirmation[]
+
+  @@unique([userId, eventId])
+  @@map("attendance")
+}
+
+model Confirmation {
+  id           String     @id @default(uuid())
+  confirmCode  String     @default("")
+  user         User       @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  userId       String
+  event        Event      @relation(fields: [eventId], references: [id], onUpdate: Cascade, onDelete: NoAction)
+  eventId      String
+  attendance   Attendance @relation(fields: [attendanceId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  attendanceId String
+  createdAt    DateTime   @default(now())
+  creator      User       @relation("ConfirmationsCreator", fields: [createdBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  createdBy    String
+  updatedAt    DateTime   @updatedAt
+  updator      User       @relation("ConfirmationUpdator", fields: [updatedBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  updatedBy    String
+  Payment      Payment[]
+
+  @@map("confirmation")
+}
+
+model Lookups {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String   @default("")
+  amount      Decimal  @default(0) @db.Decimal(12, 2)
+  category    String
+  isVisible   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("lookups")
+}
+
+model Payment {
+  id           String       @id @default(uuid())
+  user         User         @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  userId       String
+  event        Event        @relation(fields: [eventId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  eventId      String
+  attendance   Attendance   @relation(fields: [attendanceId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  attendanceId String
+  confirmation Confirmation @relation(fields: [confirmId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  confirmId    String
+  totalAmount  Decimal      @db.Decimal(12, 2)
+  status       String       @default("Pending")
+  accountant   User         @relation("accountant", fields: [paidBy], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  paidBy       String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("payments")
+}
+
+model ActionLogs {
+  id          String   @id @default(uuid())
+  action      String
+  description String
+  user        User     @relation(fields: [userId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("actionLogs")
+}
